@@ -1,0 +1,54 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: win2022vmtest
+  namespace: default
+spec:
+  running: true
+  template:
+    spec:
+      domain:
+        cpu:
+          cores: 2
+        resources:
+          requests:
+            memory: 4Gi
+        devices:
+          disks:
+            - name: winiso
+              cdrom:
+                bus: sata
+                readonly: true
+              bootOrder: 1
+            - name: unattend-iso
+              cdrom:
+                bus: sata
+                readonly: true
+              bootOrder: 2
+            - name: disk0
+              disk:
+                bus: virtio
+              bootOrder: 3
+          interfaces:
+            - name: default-net
+              bridge: {}
+              model: e1000
+        machine:
+          type: q35
+        firmware:
+          bootloader:
+            efi:
+              secureBoot: false
+      networks:
+        - name: default-net
+          pod: {}
+      volumes:
+        - name: disk0
+          persistentVolumeClaim:
+            claimName: win2022-disk-pvc
+        - name: winiso
+          persistentVolumeClaim:
+            claimName: windows-installer-iso-pvc
+        - name: unattend-iso
+          persistentVolumeClaim:
+            claimName: windows-unattend-iso-pvc

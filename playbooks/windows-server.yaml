@@ -1,0 +1,146 @@
+# Windows Server KubeVirt Deployment Playbook
+
+- name: Deploy Windows Server VM on KubeVirt
+  hosts: localhost
+  become: false
+  gather_facts: false
+  vars_prompt:
+    - name: vhd_filename
+      prompt: "Enter the VHD filename (press Enter to use default):"
+      private: no
+      default: "./20348.169.amd64fre.fe_release_svc_refresh.210806-2348_server_serverdatacentereval_en-us.vhd"
+  tasks:
+
+    - name: Show the VHD filename that will be used
+      ansible.builtin.debug:
+        msg: "VHD filename to use: {{ vhd_filename }}"
+
+    - name: Ensure VHD file exists, download if missing
+      ansible.builtin.get_url:
+        url: https://software-download.microsoft.com/download/pr/20348.169.amd64fre.fe_release_svc_refresh.210806-2348_server_serverdatacentereval_en-us.vhd
+        dest: "{{ vhd_filename }}"
+        mode: '0644'
+        owner: "{{ ansible_user | default(lookup('env', 'USER')) }}"
+        group: "{{ ansible_user | default(lookup('env', 'USER')) }}"
+        force: no
+      delegate_to: localhost
+
+    - name: Create directory for Windows VHD
+      ansible.builtin.file:
+        path: /var/kubevirt-disks/windows
+        state: directory
+        owner: 107
+        group: 107
+        mode: '0755'
+      become: true
+
+    - name: Synchronize VHD file to the node (faster for large files)
+      ansible.builtin.synchronize:
+        src: "{{ vhd_filename }}"
+        dest: /var/kubevirt-disks/windows/
+        mode: push
+      become: true
+
+    - name: Create PersistentVolume for Windows Server
+      ansible.builtin.copy:
+        dest: /tmp/windows-server-pv.yaml
+        content: |
+          apiVersion: v1
+          kind: PersistentVolume
+          metadata:
+            name: windows-server-pv
+          spec:
+            capacity:
+              storage: 50Gi
+            accessModes:
+              - ReadWriteOnce
+            hostPath:
+              path: /var/kubevirt-disks/windows
+            persistentVolumeReclaimPolicy: Retain
+
+    - name: Apply PersistentVolume for Windows Server
+      ansible.builtin.shell: kubectl apply -f /tmp/windows-server-pv.yaml
+      changed_when: false
+
+    - name: Create PersistentVolumeClaim for Windows Server
+      ansible.builtin.copy:
+        dest: /tmp/windows-server-pvc.yaml
+        content: |
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: windows-server-pvc
+            namespace: kubevirt
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 50Gi
+            volumeName: windows-server-pv
+
+    - name: Deploy Windows Server VM
+      ansible.builtin.copy:
+        dest: /tmp/windows-server.yaml
+        content: |
+          apiVersion: kubevirt.io/v1
+          kind: VirtualMachine
+          metadata:
+            name: windows-server
+            namespace: kubevirt
+          spec:
+            running: true
+            template:
+              metadata:
+                labels:
+                  kubevirt.io/domain: windows-server
+              spec:
+                domain:
+                  cpu:
+                    cores: 2
+                  devices:
+                    disks:
+                      - name: rootdisk
+                        disk:
+                          bus: virtio
+                      - name: cloudinitdisk
+                        disk:
+                          bus: virtio
+                  resources:
+                    requests:
+                      memory: 4Gi
+                volumes:
+                  - name: rootdisk
+                    persistentVolumeClaim:
+                      claimName: windows-server-pvc
+                  - name: cloudinitdisk
+                    cloudInitNoCloud:
+                      userData: |
+                        #cloud-config
+                        password: Admin123!
+                        chpasswd: { expire: False }
+                        ssh_pwauth: true
+                        disable_root: false
+                        write_files:
+                          - path: C:\EnableWinRM.ps1
+                            content: |
+                              winrm quickconfig -force
+                              winrm set winrm/config/service '@{AllowUnencrypted="true"}'
+                              winrm set winrm/config/service/auth '@{Basic="true"}'
+                              netsh advfirewall firewall add rule name="WinRM HTTP" dir=in action=allow protocol=TCP localport=5985
+                        runcmd:
+                          - powershell -ExecutionPolicy Unrestricted -File C:\EnableWinRM.ps1
+
+    - name: Apply Windows Server VM
+      ansible.builtin.shell: kubectl apply -f /tmp/windows-server.yaml
+      changed_when: false
+
+    - name: Ensure pywinrm is installed for Ansible WinRM support
+      hosts: localhost
+      gather_facts: false
+      tasks:
+        - name: Install pywinrm Python package
+          ansible.builtin.pip:
+            name: "pywinrm>=0.3.0"
+            state: present
+          delegate_to: localhost

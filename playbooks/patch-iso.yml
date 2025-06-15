@@ -1,0 +1,88 @@
+---
+- name: Inject unattend.xml into Windows Server 2022 ISO
+  hosts: localhost
+  become: yes
+  vars:
+    original_iso: "./SERVER_EVAL_x64FRE_en-us.iso"
+    unattend_xml_src: "./unattend.xml"
+    work_dir: "/tmp/win2022_iso_work"
+    mount_dir: "/tmp/win2022_iso_mount"
+    new_iso: "/tmp/Windows_Server_2022_Custom.iso"
+
+  tasks:
+    - name: Ensure required packages are installed
+      package:
+        name:
+          - genisoimage
+          - xorriso
+        state: present
+
+    - name: Ensure mount directory is unmounted and absent
+      shell: |
+        if mount | grep -q "{{ mount_dir }}"; then
+          umount "{{ mount_dir }}"
+        fi
+        rm -rf "{{ mount_dir }}"
+      args:
+        executable: /bin/bash
+
+    - name: Create mount directory
+      file:
+        path: "{{ mount_dir }}"
+        state: directory
+
+    - name: Ensure work directory is absent
+      file:
+        path: "{{ work_dir }}"
+        state: absent
+
+    - name: Create work directory
+      file:
+        path: "{{ work_dir }}"
+        state: directory
+
+    - name: Mount original ISO (shell, more reliable)
+      shell: |
+        mount -o loop "{{ original_iso }}" "{{ mount_dir }}"
+      args:
+        executable: /bin/bash
+
+    - name: Copy ISO contents to working directory
+      command: cp -a {{ mount_dir }}/. {{ work_dir }}/
+
+    - name: Unmount original ISO (shell)
+      shell: umount "{{ mount_dir }}"
+      ignore_errors: yes
+
+    - name: Ensure sources directory exists in work_dir
+      file:
+        path: "{{ work_dir }}/sources"
+        state: directory
+        mode: '0755'
+
+    - name: Copy unattend.xml to sources folder
+      copy:
+        src: "{{ unattend_xml_src }}"
+        dest: "{{ work_dir }}/sources/unattend.xml"
+        mode: '0644'
+
+    - name: Rebuild the bootable ISO with injected unattend.xml (efisys.bin for UEFI)
+      command: >
+        mkisofs -iso-level 3 -J -joliet-long -relaxed-filenames
+        -b boot/etfsboot.com -no-emul-boot -boot-load-size 8 -boot-info-table
+        -eltorito-alt-boot -e efi/microsoft/boot/efisys.bin -no-emul-boot
+        -o {{ new_iso }} {{ work_dir }}
+
+    - name: Clean up mount directory
+      file:
+        path: "{{ mount_dir }}"
+        state: absent
+
+    - name: Clean up working directory
+      file:
+        path: "{{ work_dir }}"
+        state: absent
+
+    - name: Display new ISO path
+      debug:
+        msg: "New customized ISO created at {{ new_iso }}"

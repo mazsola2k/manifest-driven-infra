@@ -1,0 +1,20 @@
+- name: Install MS SQL Server 2022 on Windows VM
+  hosts: windows
+  tasks:
+    - name: Download SQL Server 2022 installer
+      win_get_url:
+        url: https://go.microsoft.com/fwlink/?linkid=2215202&clcid=0x409&culture=en-us&country=us
+        dest: C:\Temp\SQL2022.exe
+
+    - name: Install SQL Server 2022 (Evaluation Edition, default instance, mixed auth)
+      win_command: >
+        C:\Temp\SQL2022.exe /Q /ACTION=Install /IACCEPTSQLSERVERLICENSETERMS
+        /FEATURES=SQLENGINE
+        /INSTANCENAME=MSSQLSERVER
+        /SECURITYMODE=SQL
+        /SAPWD="YourStrong!Passw0rd"
+        /TCPENABLED=1
+        /SQLSVCACCOUNT="NT AUTHORITY\SYSTEM"
+        /SQLSYSADMINACCOUNTS="Administrator"
+      args:
+        creates: 'C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Binn\sqlservr.exe'

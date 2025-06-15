@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: installer-iso-uploader
+  namespace: default
+spec:
+  containers:
+    - name: uploader
+      image: busybox
+      command: ["sleep", "3600"]
+      volumeMounts:
+        - name: iso
+          mountPath: /data
+  restartPolicy: Never
+  volumes:
+    - name: iso
+      persistentVolumeClaim:
+        claimName: windows-installer-iso-pvc
