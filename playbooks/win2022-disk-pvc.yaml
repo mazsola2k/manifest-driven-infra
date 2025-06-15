@@ -6,7 +6,8 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: longhorn
   resources:
     requests:
-      storage: 50Gi
-  storageClassName: hostpath
+      storage: 50Gi   # Adjust size as needed for your Windows VM
+  volumeName: win2022-disk

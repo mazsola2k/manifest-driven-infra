@@ -15,17 +15,17 @@ spec:
             memory: 4Gi
         devices:
           disks:
-            - name: winiso
+            - name: windows-installer-iso
               cdrom:
                 bus: sata
                 readonly: true
               bootOrder: 1
-            - name: unattend-iso
+            - name: windows-unattend-iso
               cdrom:
                 bus: sata
                 readonly: true
               bootOrder: 2
-            - name: disk0
+            - name: win2022-disk
               disk:
                 bus: virtio
               bootOrder: 3
@@ -43,12 +43,12 @@ spec:
         - name: default-net
           pod: {}
       volumes:
-        - name: disk0
+        - name: win2022-disk
           persistentVolumeClaim:
             claimName: win2022-disk-pvc
-        - name: winiso
+        - name: windows-installer-iso
           persistentVolumeClaim:
             claimName: windows-installer-iso-pvc
-        - name: unattend-iso
+        - name: windows-unattend-iso
           persistentVolumeClaim:
             claimName: windows-unattend-iso-pvc

@@ -1,15 +1,14 @@
-apiVersion: cdi.kubevirt.io/v1beta1
-kind: DataVolume
+# windows-unattend-iso-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: windows-unattend-iso
+  name: windows-unattend-iso-pvc
   namespace: default
 spec:
-  source:
-    upload: {}
-  pvc:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 1Gi
-    storageClassName: longhorn
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi # or the size of your unattend ISO
+  volumeName: windows-unattend-iso

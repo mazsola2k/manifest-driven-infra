@@ -1,15 +1,14 @@
-apiVersion: cdi.kubevirt.io/v1beta1
-kind: DataVolume
+# windows-installer-iso-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: windows-installer-iso
+  name: windows-installer-iso-pvc
   namespace: default
 spec:
-  source:
-    upload: {}
-  pvc:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 8Gi
-    storageClassName: longhorn  # or another CDI-compatible storage class
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 8Gi # or the size of your ISO
+  volumeName: windows-installer-iso
